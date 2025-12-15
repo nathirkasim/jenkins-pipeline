@@ -1,0 +1,120 @@
+pipeline {
+  agent {
+    docker {
+      image 'maven:3.8.6-openjdk-11'
+      args '--user root -v /var/run/docker.sock:/var/run/docker.sock'
+    }
+  }
+  
+  stages {
+    stage('Checkout') {
+      steps {
+        echo 'Checking out code from GitHub...'
+        git branch: 'main', url: 'https://github.com/nathirkasim/jenkins-pipeline.git'
+      }
+    }
+    
+    stage('Build and Package') {
+      steps {
+        echo 'Building the application...'
+        sh 'mvn clean package'
+        echo 'Build completed successfully!'
+      }
+    }
+    
+    stage('Static Code Analysis') {
+      environment {
+        SONAR_URL = "http://host.docker.internal:9000"
+      }
+      steps {
+        echo 'Running SonarQube analysis...'
+        withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_AUTH_TOKEN')]) {
+          sh '''
+            mvn sonar:sonar \
+              -Dsonar.login=$SONAR_AUTH_TOKEN \
+              -Dsonar.host.url=${SONAR_URL} \
+              -Dsonar.projectKey=jenkins-pipeline \
+              -Dsonar.projectName=jenkins-pipeline
+          '''
+        }
+        echo 'SonarQube analysis completed!'
+      }
+    }
+    
+    stage('Build Docker Image') {
+      environment {
+        DOCKER_IMAGE = "nathirkasim/pipe:${BUILD_NUMBER}"
+      }
+      steps {
+        echo "Building Docker image: ${DOCKER_IMAGE}"
+        script {
+          // Install Docker CLI in the Maven container
+          sh '''
+            apt-get update -qq
+            apt-get install -y docker.io
+          '''
+          sh "docker build -t ${DOCKER_IMAGE} ."
+        }
+        echo 'Docker image built successfully!'
+      }
+    }
+    
+    stage('Push Docker Image') {
+      environment {
+        DOCKER_IMAGE = "nathirkasim/pipe:${BUILD_NUMBER}"
+      }
+      steps {
+        echo "Pushing Docker image: ${DOCKER_IMAGE}"
+        script {
+          withCredentials([usernamePassword(credentialsId: 'docker-cred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+            sh '''
+              echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
+              docker push ${DOCKER_IMAGE}
+              docker logout
+            '''
+          }
+        }
+        echo 'Docker image pushed successfully!'
+      }
+    }
+    
+    stage('Update Deployment File') {
+      environment {
+        GIT_REPO_NAME = "jenkins-pipeline"
+        GIT_USER_NAME = "nathirkasim"
+      }
+      steps {
+        echo 'Updating Kubernetes deployment file...'
+        withCredentials([string(credentialsId: 'github-token', variable: 'GITHUB_TOKEN')]) {
+          sh '''
+            git config user.email "nathirkasim@example.com"
+            git config user.name "Nathir Kasim"
+            
+            # Update the image tag in deployment file
+            sed -i "s|image: nathirkasim/pipe:.*|image: nathirkasim/pipe:${BUILD_NUMBER}|g" k8s/deployment.yaml
+            
+            # Commit and push changes
+            git add k8s/deployment.yaml
+            git commit -m "Update deployment image to version ${BUILD_NUMBER}" || echo "No changes to commit"
+            git push https://${GITHUB_TOKEN}@github.com/${GIT_USER_NAME}/${GIT_REPO_NAME} HEAD:main
+          '''
+        }
+        echo 'Deployment file updated successfully!'
+      }
+    }
+  }
+  
+  post {
+    success {
+      echo '✅ Pipeline completed successfully!'
+      echo "Docker Image: nathirkasim/pipe:${BUILD_NUMBER}"
+    }
+    failure {
+      echo '❌ Pipeline failed! Check the logs for details.'
+    }
+    always {
+      echo 'Cleaning up workspace...'
+      cleanWs()
+    }
+  }
+}
