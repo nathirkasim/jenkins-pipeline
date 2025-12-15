@@ -102,8 +102,8 @@ pipeline {
                   apt-get install -y git
               fi
             # Configure git
-            git config user.email "nathirkasim@example.com"
-            git config user.name "Nathir Kasim"
+            git config --global user.email "nathirkasim@example.com"
+            git config --global user.name "Nathir Kasim"
             
             # Update the image tag in deployment file
             sed -i 's|image: nathirkasim/pipe:.*|image: nathirkasim/pipe:${BUILD_NUMBER}|g' k8s/deployment.yaml
