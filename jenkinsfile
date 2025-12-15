@@ -24,7 +24,7 @@ pipeline {
     
     stage('Static Code Analysis') {
       environment {
-        SONAR_URL = "http://host.docker.internal:9000"
+        SONAR_URL = "http://ec2-13-60-20-151.eu-north-1.compute.amazonaws.com:9000"
       }
       steps {
         echo 'Running SonarQube analysis...'
