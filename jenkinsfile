@@ -102,6 +102,7 @@ pipeline {
                   apt-get install -y git
               fi
             # Configure git
+            git config --global --add safe.directory '*'
             git config --global user.email "nathirkasim@example.com"
             git config --global user.name "Nathir Kasim"
             
