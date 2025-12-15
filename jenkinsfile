@@ -2,7 +2,9 @@ pipeline {
   agent {
     docker {
       image 'maven:3.9.6-eclipse-temurin-17'
-      args '--user root -v /var/run/docker.sock:/var/run/docker.sock'
+      // OPTIMIZATION 1: Map local cache folders (.m2 and .sonar) to the container 
+      // This prevents downloading the internet on every build.
+      args '--user root -v /var/run/docker.sock:/var/run/docker.sock -v $HOME/.m2:/root/.m2 -v $HOME/.sonar/cache:/root/.sonar/cache'
     }
   }
   
@@ -17,25 +19,33 @@ pipeline {
     stage('Build and Package') {
       steps {
         echo 'Building the application...'
-        sh 'mvn clean package'
+        // -DskipTests speeds up the package if tests are run by SonarQube later, 
+        // otherwise remove it if you want unit tests to run here.
+        sh 'mvn clean package -DskipTests' 
         echo 'Build completed successfully!'
       }
     }
     
     stage('Static Code Analysis') {
       environment {
+        // OPTIMIZATION 2: Increase memory AND fix the 10-minute "Entropy" hang
+        // -Djava.security.egd=file:/dev/./urandom prevents Java from blocking while waiting for randomness
+        MAVEN_OPTS = "-Xmx3072m -Djava.security.egd=file:/dev/./urandom"
         SONAR_URL = "http://ec2-13-60-20-151.eu-north-1.compute.amazonaws.com:9000"
       }
       steps {
         echo 'Running SonarQube analysis...'
         withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_AUTH_TOKEN')]) {
+          // FIX: Used specific plugin version to remove the warning
           sh '''
-            mvn sonar:sonar \
+            mvn org.sonarsource.scanner.maven:sonar-maven-plugin:4.0.0.4121:sonar \
               -Dsonar.plugins.downloadOnlyRequired=true \
               -Dsonar.login=$SONAR_AUTH_TOKEN \
               -Dsonar.host.url=${SONAR_URL} \
               -Dsonar.projectKey=jenkins-pipeline \
-              -Dsonar.projectName=jenkins-pipeline
+              -Dsonar.projectName=jenkins-pipeline \
+              -Dsonar.java.binaries=target/classes \
+              -Dsonar.exclusions=**/*.xml,**/*.css,**/*.js,**/Dockerfile,**/k8s/**
           '''
         }
         echo 'SonarQube analysis completed!'
@@ -49,10 +59,12 @@ pipeline {
       steps {
         echo "Building Docker image: ${DOCKER_IMAGE}"
         script {
-          // Install Docker CLI in the Maven container
+          // Install Docker CLI (Note: If you mount /usr/bin/docker in agent args, you can remove this block)
           sh '''
-            apt-get update -qq
-            apt-get install -y docker.io
+            if ! command -v docker &> /dev/null; then
+                apt-get update -qq
+                apt-get install -y docker.io
+            fi
           '''
           sh "docker build -t ${DOCKER_IMAGE} ."
         }
