@@ -96,6 +96,11 @@ pipeline {
         echo 'Updating Kubernetes deployment file...'
         withCredentials([string(credentialsId: 'github-token', variable: 'GITHUB_TOKEN')]) {
           sh """
+            #if git not available
+            if ! command -v git &> /dev/null; then
+                  apt-get update -qq
+                  apt-get install -y git
+              fi
             # Configure git
             git config user.email "nathirkasim@example.com"
             git config user.name "Nathir Kasim"
