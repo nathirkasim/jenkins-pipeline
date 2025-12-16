@@ -31,7 +31,7 @@ pipeline {
         // OPTIMIZATION 2: Increase memory AND fix the 10-minute "Entropy" hang
         // -Djava.security.egd=file:/dev/./urandom prevents Java from blocking while waiting for randomness
         MAVEN_OPTS = "-Xmx3072m -Djava.security.egd=file:/dev/./urandom"
-        SONAR_URL = "http://ec2-13-60-20-151.eu-north-1.compute.amazonaws.com:9000"
+        SONAR_URL = "http://ec2-51-21-197-195.eu-north-1.compute.amazonaws.com:9000"
       }
       steps {
         echo 'Running SonarQube analysis...'
