@@ -7,6 +7,7 @@ Architecture
 
 Tech Stack
 Jenkins | Maven | Docker | Kubernetes | ArgoCD | SonarQube | Tomcat | Java 11
+
 Quick Start
 bash
 # Clone repository
