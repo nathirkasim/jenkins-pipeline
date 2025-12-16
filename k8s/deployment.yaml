@@ -16,6 +16,6 @@ spec:
     spec:
       containers:
       - name: first-pipeline-container
-        image: nathirkasim/pipe:16
+        image: nathirkasim/pipe:18
         ports:
         - containerPort: 8080 # Internal ONLY. Does not conflict with Jenkins.
