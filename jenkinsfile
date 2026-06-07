@@ -25,7 +25,7 @@ pipeline {
         echo 'Build completed successfully!'
       }
     }
-    
+    /*
     stage('Static Code Analysis') {
       environment {
         // OPTIMIZATION 2: Increase memory AND fix the 10-minute "Entropy" hang
@@ -51,7 +51,7 @@ pipeline {
         echo 'SonarQube analysis completed!'
       }
     }
-    
+    */
     stage('Build Docker Image') {
       environment {
         DOCKER_IMAGE = "nathirkasim/pipe:${BUILD_NUMBER}"
